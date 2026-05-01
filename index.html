@@ -1083,8 +1083,6 @@
           </div>
           <span style="color: var(--muted-light); font-size: 0.9rem;">→</span>
         </a>
-          
-        </a>
         <a href="mailto:info@numericatutoring.com" class="contact-row">
           <div class="contact-icon">✉️</div>
           <div class="contact-label">
@@ -1163,15 +1161,17 @@
     }
 
     function createSymbol(x, y) {
+      // If user prefers reduced motion, slow drift to near-zero but keep loop alive
+      const driftScale = reduceMotion ? 0.05 : 1;
       return {
         text: SYMBOL_SET[Math.floor(Math.random() * SYMBOL_SET.length)],
         x: x !== undefined ? x : Math.random() * width,
         y: y !== undefined ? y : Math.random() * height,
         size: 18 + Math.random() * 26,
-        vx: (Math.random() - 0.5) * 0.4,
-        vy: (Math.random() - 0.5) * 0.4,
+        vx: (Math.random() - 0.5) * 0.4 * driftScale,
+        vy: (Math.random() - 0.5) * 0.4 * driftScale,
         rot: (Math.random() - 0.5) * 0.6,
-        rotSpeed: (Math.random() - 0.5) * 0.004,
+        rotSpeed: (Math.random() - 0.5) * 0.004 * driftScale,
         baseAlpha: 0.12 + Math.random() * 0.14,
         color: Math.random() > 0.75 ? '242,101,34' : '15,30,61'
       };
@@ -1233,21 +1233,29 @@
         ctx.restore();
       }
 
-      if (!reduceMotion) requestAnimationFrame(update);
+      // Always keep the loop alive so cursor interaction works.
+      // Drift is scaled down separately when reduce-motion is enabled.
+      requestAnimationFrame(update);
     }
 
-    // Pointer tracking — mouse uses 'mousemove' on document for reliability
-    document.addEventListener('mousemove', (e) => {
+    // ─── Pointer tracking (FIXED for desktop) ───
+    // Use window-level mousemove so it fires reliably even over fixed elements
+    window.addEventListener('mousemove', (e) => {
       pointer.x = e.clientX;
       pointer.y = e.clientY;
       pointer.active = true;
     }, { passive: true });
 
-    // When mouse leaves the document entirely, deactivate
-    document.addEventListener('mouseout', (e) => {
-      if (!e.relatedTarget && !e.toElement) {
-        pointer.active = false;
-      }
+    // Only deactivate when cursor actually leaves the viewport entirely
+    // (mouseleave on document fires once on real exit, unlike mouseout which
+    // fires on every child element transition)
+    document.addEventListener('mouseleave', () => {
+      pointer.active = false;
+    });
+
+    // Also deactivate when window loses focus (e.g. user tabs away)
+    window.addEventListener('blur', () => {
+      pointer.active = false;
     });
 
     // Touch tracking (mobile)
